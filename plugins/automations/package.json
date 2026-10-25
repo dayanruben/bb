@@ -34,7 +34,7 @@
     "@tanstack/react-query": "^5.62.0",
     "cron-parser": "^5.5.0",
     "cronstrue": "^3.14.0",
-    "zod": "^4.3.6"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@bb/plugin-build": "workspace:*",
@@ -46,7 +46,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "better-sqlite3": "12.10.0",
-    "hono": "4.11.9",
+    "hono": "4.13.11",
     "jsdom": "^29.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
