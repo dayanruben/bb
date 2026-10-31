@@ -160,7 +160,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
     "cross-spawn": "^7.0.6",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@bb/domain": "workspace:*",
@@ -178,7 +178,7 @@
     "better-sqlite3": "12.10.0",
     "cron-parser": "^5.5.0",
     "esbuild": "^0.28.0",
-    "hono": "4.11.9",
+    "hono": "4.13.11",
     "jsdom": "^29.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -35,7 +35,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.4.0",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@bb/tsconfig": "workspace:*",
@@ -50,7 +50,7 @@
     "tailwindcss": "^4.3.0",
     "tsrs": "0.18.0-ts7.1.0-dev.20260929",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vite": "^8.0.12",
+    "vite": "^8.1.6",
     "wrangler": "^4.107.0"
   }
 }
