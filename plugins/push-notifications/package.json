@@ -31,8 +31,8 @@
     "prepare:bundled": "bb-plugin-build prepare-bundled"
   },
   "dependencies": {
-    "undici": "^7.28.0",
-    "zod": "^4.3.6"
+    "undici": "^7.30.1",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@bb/plugin-build": "workspace:*",
@@ -45,7 +45,7 @@
     "@types/react-dom": "^19.0.0",
     "better-sqlite3": "12.10.0",
     "cron-parser": "^5.5.0",
-    "hono": "4.11.9",
+    "hono": "4.13.11",
     "jsdom": "^29.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

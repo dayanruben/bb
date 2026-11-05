@@ -25,13 +25,13 @@
     "@agentclientprotocol/sdk": "1.7.0",
     "@bb/domain": "workspace:*",
     "@bb/provider-bridge-protocol": "workspace:*",
-    "zod": "^4.3.6",
+    "zod": "^4.6.6",
     "@bb/process-utils": "workspace:*"
   },
   "devDependencies": {
     "@bb/test-helpers": "workspace:*",
     "@bb/tsconfig": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@types/node": "^22.0.0",
     "tsrs": "0.18.0-ts7.1.0-dev.20260929",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
