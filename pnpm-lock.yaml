@@ -282,8 +282,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0(jotai@2.20.3(@babel/core@7.29.13)(@babel/template@7.29.7)(@types/react@19.3.0)(react@19.3.1))
       katex:
-        specifier: ^0.16.47
-        version: 0.16.47
+        specifier: ^0.18.2
+        version: 0.18.2
       mermaid:
         specifier: ^11.17.2
         version: 11.17.2(patch_hash=3m5kmqlt3oscxkkb53ahujfawq)
@@ -550,8 +550,8 @@ importers:
         specifier: ^3.0.2
         version: 3.0.2
       undici:
-        specifier: ^7.30.2
-        version: 7.30.2
+        specifier: ^8.12.4
+        version: 8.12.4
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -3404,8 +3404,8 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.1)
       undici:
-        specifier: ^7.30.2
-        version: 7.30.2
+        specifier: ^8.12.4
+        version: 8.12.4
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -5677,8 +5677,8 @@ importers:
   plugins/push-notifications:
     dependencies:
       undici:
-        specifier: ^7.30.2
-        version: 7.30.2
+        specifier: ^8.12.4
+        version: 8.12.4
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -7899,7 +7899,7 @@ packages:
 
   '@expo/bunyan@4.0.1':
     resolution: {integrity: sha512-+Lla7nYSiHZirgK+U/uYzsLv/X+HaJienbD5AKX1UQZHYfWaP+9uuQluRB4GrEVWF0GZ7vEVp/jzaOT9k/SQlg==}
-    engines: {'0': node >=0.10.0}
+    engines: {node: '>=0.10.0'}
 
   '@expo/cli@58.1.19':
     resolution: {integrity: sha512-zoLhSlFnln0xn1fiW0+kb1J0lNv06HAy+FQ27HHwEEWoAClCE13FnTQBOW5bOVYc3c7hsGM8ypKcZGS7RGqjQA==}
@@ -14426,6 +14426,10 @@ packages:
 
   katex@0.16.47:
     resolution: {integrity: sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==}
+    hasBin: true
+
+  katex@0.18.2:
+    resolution: {integrity: sha512-3snve4y0SXTMequLim1FMiPvLGElySam0blN5xQZBqEY3lOJz1TnuaaiugnBZBqHzlSAGmFTYL7MCQkORuLKCA==}
     hasBin: true
 
   keychain@1.5.0:
@@ -23628,7 +23632,7 @@ snapshots:
       obug: 2.2.1
       std-env: 4.3.0
       tinyrainbow: 3.2.0
-      vitest: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@24.19.2)(@typescript/typescript6@6.0.2))(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      vitest: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@22.20.5)(@typescript/typescript6@6.0.2))(vite@8.3.6(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   '@vitest/expect@4.1.12':
     dependencies:
@@ -27051,6 +27055,10 @@ snapshots:
       safe-buffer: 5.2.1
 
   katex@0.16.47:
+    dependencies:
+      commander: 8.3.0
+
+  katex@0.18.2:
     dependencies:
       commander: 8.3.0
 
