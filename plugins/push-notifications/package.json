@@ -31,7 +31,7 @@
     "prepare:bundled": "bb-plugin-build prepare-bundled"
   },
   "dependencies": {
-    "undici": "^7.30.2",
+    "undici": "^8.12.4",
     "zod": "^4.6.7"
   },
   "devDependencies": {
