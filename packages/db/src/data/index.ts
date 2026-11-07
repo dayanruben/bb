@@ -151,6 +151,19 @@ export {
 } from "./app-settings.js";
 export { getStoredThreadTabs, replaceStoredThreadTabs } from "./thread-tabs.js";
 export {
+  deleteThreadPurgeBatch,
+  nextThreadPurge,
+  requestThreadPurge,
+} from "./thread-purges.js";
+export {
+  deleteSweepItemFailures,
+  deleteSweepItemFailuresOfUnknownSweeps,
+  getSweepItemFailure,
+  listSweepItemFailures,
+  upsertSweepItemFailure,
+} from "./sweep-item-failures.js";
+export type { SweepItemFailure } from "./sweep-item-failures.js";
+export {
   getStoredUiPreferenceDefault,
   listStoredUiPreferenceDefaults,
   listStoredUiPreferences,
@@ -229,6 +242,7 @@ export {
   claimPluginScheduledRun,
   deletePluginSchedules,
   listDuePluginSchedules,
+  pluginScheduleKey,
   listPluginSchedules,
   prunePluginSchedules,
   recordPluginScheduleResult,
@@ -238,7 +252,7 @@ export {
   createPluginStateSnapshot,
   deletePluginStateSnapshot,
   getPluginStateSnapshot,
-  listExpiredPluginStateSnapshots,
+  listDiscardablePluginStateSnapshots,
   listGarbageCollectablePluginArtifacts,
   listIncompletePluginRollbackSnapshots,
   listPluginStateSnapshots,
@@ -427,8 +441,10 @@ export type {
 export {
   countTerminalSessions,
   createTerminalSession,
+  EXITED_TERMINAL_SESSION_ROW_RETENTION_MS,
   getTerminalSession,
   listTerminalSessions,
+  pruneExitedTerminalSessions,
   updateTerminalSession,
   updateTerminalSessions,
 } from "./terminal-sessions.js";
@@ -545,7 +561,9 @@ export {
 export * from "./machines.js";
 export {
   advanceThreadPruning,
+  deleteThreadScopedPruningCursors,
   getNextThreadPruningPolicy,
+  pickThreadPruningThread,
   THREAD_PRUNING_POLICIES,
 } from "./thread-pruning.js";
 export {

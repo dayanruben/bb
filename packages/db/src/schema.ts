@@ -710,6 +710,17 @@ export const threadPluginMetadata = sqliteTable(
   (table) => [primaryKey({ columns: [table.threadId, table.pluginId] })],
 );
 
+export const threadPurges = sqliteTable(
+  "thread_purges",
+  {
+    threadId: text("thread_id")
+      .primaryKey()
+      .references(() => threads.id, { onDelete: "cascade" }),
+    requestedAt: integer("requested_at").notNull(),
+  },
+  (table) => [index("thread_purges_requested_idx").on(table.requestedAt)],
+);
+
 export const threadTabs = sqliteTable("thread_tabs", {
   threadId: text("thread_id")
     .primaryKey()
@@ -951,6 +962,19 @@ export const maintenanceScanCursors = sqliteTable(
       table.outputPath,
     ),
   ],
+);
+
+export const sweepItemFailures = sqliteTable(
+  "sweep_item_failures",
+  {
+    sweep: text("sweep").notNull(),
+    itemKey: text("item_key").notNull(),
+    attempts: integer("attempts").notNull(),
+    firstFailedAt: integer("first_failed_at").notNull(),
+    retryAt: integer("retry_at").notNull(),
+    lastError: text("last_error").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.sweep, table.itemKey] })],
 );
 
 export const promptHistoryEntries = sqliteTable(
@@ -1207,6 +1231,9 @@ export const terminalSessions = sqliteTable(
     ),
     index("terminal_sessions_host_status_idx").on(table.hostId, table.status),
     index("terminal_sessions_daemon_session_idx").on(table.daemonSessionId),
+    index("terminal_sessions_exited_prune_idx")
+      .on(table.updatedAt, table.id)
+      .where(sql`${table.status} = 'exited'`),
   ],
 );
 
