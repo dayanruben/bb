@@ -3,9 +3,23 @@ export type {
   DbConnection,
   DbQueryConnection,
   DbTransaction,
+  QueryPlanExecutionObserver,
   SlowDbQueryLogger,
   SlowDbQueryLogFields,
 } from "./connection.js";
+export {
+  createQueryPlanAuditor,
+  openQueryPlanAuditDatabase,
+} from "./query-plan-guard.js";
+export type {
+  QueryPlanAuditor,
+  QueryPlanFindingReport,
+} from "./query-plan-guard.js";
+export { startWalCheckpointer } from "./wal-checkpointer.js";
+export type {
+  WalCheckpointer,
+  WalCheckpointLogger,
+} from "./wal-checkpointer.js";
 
 export * from "./schema.js";
 export {

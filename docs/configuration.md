@@ -125,7 +125,8 @@ These entries are startup-only:
 - `BB_HOST_DAEMON_PORT` and `BB_INHERITED_SKILLS_ROOTS`
 - `BB_CONNECT_GATE_KEYS_URL`, `BB_LOG_LEVEL`,
   `BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD`, `BB_MARKETPLACE_URL`,
-  `BB_PERF_DIAGNOSTICS`, `BB_POSTHOG_API_KEY`, and `BB_TELEMETRY`
+  `BB_PERF_DIAGNOSTICS`, `BB_POSTHOG_API_KEY`, `BB_QUERY_PLAN_AUDIT`, and
+  `BB_TELEMETRY`
 - `BB_SERVER_BIND_HOST`, `BB_SERVER_PORT`, and all `BB_FF_*` feature flags
 
 Setting or unsetting one still reloads any other pending changes, but running
@@ -253,6 +254,7 @@ change the host-daemon protocol.
 | `BB_SKIP_ONBOARDING`           | Environment                                        | Startup-only            | Default false. `1` marks first-run setup completed at startup when it is not yet, so the setup screen is skipped. Settings → General can still replay it. `pnpm dev`, `pnpm start:worktree`, and `pnpm desktop:worktree` default it to `1`; an explicit `0` retains setup. |
 | `BB_SETUP_GUIDE_VARIANT`       | Environment                                        | Startup-only QA         | `control` or `new` forces the first-run setup guide variant, ignoring telemetry and the `setup-guide-redesign` experiment. Unset by default. See [General settings](#general-settings).                                                                                    |
 | `BB_PERF_DIAGNOSTICS`          | `bb-app env`, environment, or `--perf-diagnostics` | Startup-only            | Default false. Permits the `performanceDiagnostics` experiment; see [Experiments](#experiments).                                                                                                                                                                           |
+| `BB_QUERY_PLAN_AUDIT`          | Environment                                        | Startup-only debugging  | Default false. `1` logs `Slow SQLite query plan` for each query whose plan walks a large table or picks a weaker index; see [diagnostics](debugging-and-qa.md#slow-sqlite-query-plans). `pnpm dev`, `pnpm start:worktree`, and `pnpm desktop:worktree` default it to `1`. The `performanceDiagnostics` experiment also turns it on. |
 | `BB_CLI_ERROR_LOG`             | Environment of the `bb` process                    | Optional                | `0` stops the CLI recording failed invocations (command path, error code, no argument values) to `<dataDir>/logs/cli-errors.jsonl`. See `bb guide overview`.                                                                                                               |
 | `BB_ACCOUNT_POOL_PARENT_URL`   | Set automatically by a parent bb server            | Nested bb servers       | Account Pooler hub of the bb server whose thread launched this one. When present the Account Pooler plugin is enabled on first run and proxies to that parent; `bb pool parent isolate` opts out. Not a `bb-app config` key.                                               |
 | `BB_ACCOUNT_POOL_PARENT_TOKEN` | Set automatically by a parent bb server            | Nested bb servers       | Machine token this nested server presents to the parent hub. Both parent variables must be well formed or proxying stays off.                                                                                                                                              |
@@ -972,13 +974,22 @@ bb stores only the experiments you set; the others follow the shipped default.
 The `earlyAdopter` general setting (the Become an early adopter banner on
 Settings → Experiments, `bb settings general earlyAdopter on`) switches the
 shipped default to the early adopter default: experiments marked Early adopter
-(currently `compactExpiredCache`, `dismissReadNotifications`,
-`narrowPluginCss`, `pluginUpdates`, `skipFocusedThreadNotifications`,
-`threadRowMetadata`, and `updateWhenIdle`) turn on, and the rest stay off. An experiment you set yourself keeps your value
+(currently `agentCpuPriority`, `compactExpiredCache`, `dismissReadNotifications`,
+`pluginUpdates`, `skipFocusedThreadNotifications`, `threadRowMetadata`, and
+`updateWhenIdle`) turn on, and the rest stay off. An experiment you set yourself keeps your value
 either way.
 `/system/config` and `sdk.system.config()` return the resolved values in
 `experiments`.
 
+- `agentCpuPriority` keeps bb responsive when agents saturate the CPU. The
+  host daemon starts provider processes and environment setup and teardown
+  scripts at nice 10 (below-normal on Windows), inherited by
+  the builds and tests they run; terminals keep normal priority. On macOS the
+  launcher also starts the server and daemon with application scheduling
+  (`taskpolicy -a`). Turning it on or off takes effect after restarting bb,
+  including the restart an update performs: running provider processes serve
+  new threads too, and a lowered process cannot be raised again. See
+  [slow database operations](debugging-and-qa.md#slow-database-operations).
 - `compactExpiredCache` (on for early adopters) reports `compactionOfferAt` on a thread's context
   usage (timeline `contextWindowUsage` and `bb thread context`) once the
   provider has reported a prompt-cache lifetime, the provider supports manual
@@ -997,21 +1008,14 @@ either way.
   the background task; an older Android app in the foreground would list the
   silent push as a blank notification.
   The plugin reads it on each delivery and read, so a toggle applies live.
-- `narrowPluginCss` (on for early adopters) makes the app request each plugin's
-  stylesheet with `css-scope=owned-root-v1`. bb then serves utilities that
-  match only inside that plugin's own roots, not inside any root without a
-  plugin id, which makes style recalculation cheaper with many plugins. A
-  bundle whose `app.js` sets `data-bb-plugin-root` without `data-bb-plugin`
-  keeps the slower stylesheet either way. The app reads the experiment when it
-  loads a plugin's stylesheet, so a toggle applies after a reload. See
-  [Plugin Stylesheet Version Skew](debugging-and-qa.md#plugin-stylesheet-version-skew).
 - `serverMove` enables Move server here in Settings → Machines,
   `bb server move`, `bb server export`, and old server copy deletion; while off
   those routes return 403 `server_move_experiment_disabled` (status and cancel
   stay available). See `bb guide machines`.
 - `performanceDiagnostics` turns on server performance diagnostics: slow
-  database, API, and event-loop logging, periodic performance samples, and
-  continuous V8 CPU profiles written every 30 seconds to
+  database, API, and event-loop logging, slow SQLite query plan warnings,
+  periodic performance samples, and continuous V8 CPU profiles written every
+  30 seconds to
   `<dataDir>/logs/performance/`. Profiles are kept for 12 hours with a 1 GB
   total cap (oldest first), and a profile over 12 MiB is discarded. It needs
   startup permission from `BB_PERF_DIAGNOSTICS=1` or the launcher flag
@@ -1125,6 +1129,21 @@ either way.
   experiment is off, the schedule and automatic update routes return 403
   `update_when_idle_experiment_disabled`, the CLI commands print how to turn it
   on, and turning it off drops a waiting update. See `bb guide machines`.
+- `walCheckpointWorker` moves SQLite WAL checkpoints for `bb.db` and plugin
+  `data.db` files off the server's main thread. A background worker thread
+  opens its own connection to each database and runs `wal_checkpoint(PASSIVE)`
+  every 100 ms, and right away again while the WAL holds 4,096 frames or more
+  and is still growing; the server's own connections set
+  `wal_autocheckpoint=0`, so a commit no longer copies the WAL into the
+  database file and fsyncs it. If sustained writes grow the WAL past 16,384
+  frames across two worker passes, the server checkpoints the small remaining
+  tail itself between tasks and logs "Sustained writes outpaced the WAL
+  checkpoint worker". The hourly incremental vacuum waits for a worker pass
+  around each chunk instead of checkpointing inline. If the worker exits or
+  cannot open a database, those connections go back to checkpointing on
+  commit and bb logs a warning; a worker that had started restarts after
+  10 seconds. The experiment applies live: turning it off stops the worker
+  after a final checkpoint and restores `wal_autocheckpoint=1000`.
 
 ## Thread Timeline Window
 
@@ -1143,8 +1162,8 @@ that is still running or has no answer puts it above the first row after your
 read point, and the divider never lands on your own message.
 
 Timeline builds slower than 150 ms log `Thread timeline build blocked the event
-loop`, and event-loop stalls over 500 ms log `Event loop stalled`, both at
-`info`.
+loop` with main-thread CPU time and context-switch counts, and event-loop
+stalls over 500 ms log `Event loop stalled`, both at `info`.
 
 ## Plugins
 

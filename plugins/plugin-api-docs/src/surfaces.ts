@@ -1593,7 +1593,8 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "Use bb's own API from plugin server code. With this, a plugin can:",
         bullets: [
           "Create threads attributed to the plugin, send messages, and manage projects and machines",
-          "Start plugin updates in the background and follow their progress or rollback",
+          "Run plugin updates and provider CLI installs in the background and follow them to the end",
+          "Find plugin releases outside the saved version range and change the range to take one",
           "Retry failed environment cleanup with recover: true after inspecting processes using the workspace",
         ],
         reference: [
@@ -1622,11 +1623,14 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "PluginBbSdk.plugins.experimental_pruneCache",
           "PluginBbSdk.plugins.experimental_startUpdate",
           "PluginBbSdk.plugins.experimental_updateJobs",
+          "PluginBbSdk.hosts.experimental_startProviderCliInstall",
+          "PluginBbSdk.hosts.experimental_providerCliInstallJobs",
           "PluginBbSdk.threads.queuedMessages.experimental_holdForEdit",
           "PluginBbSdk.threads.queuedMessages.experimental_releaseEditHold",
           "PluginBbSdk.threads.experimental_listDescendants",
           "PluginBbSdk.threads.experimental_listCascade",
           "PluginBbSdk.threads.experimental_regenerateTitle",
+          "PluginBbSdk.threads.experimental_headState",
         ],
         firstParty: [
           "Account Pooler [Experimental]",
