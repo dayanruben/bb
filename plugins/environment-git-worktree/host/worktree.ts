@@ -14,6 +14,7 @@ import {
   getGitCommonDir,
   hasRef,
   readGitRepositoryState,
+  resolveBranchRef,
   runGit,
   WorkspaceError,
   type GitProcessOptions,
@@ -500,7 +501,23 @@ async function readCompletedBranch(
   }
 }
 
+async function refreshWorktreeIndex(
+  worktreePath: string,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  try {
+    await runGit(["update-index", "-q", "--refresh", "--force-write-index"], {
+      cwd: worktreePath,
+      allowFailure: true,
+      ...signalOptions(signal),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw createProvisionCancelledError(error);
+  }
+}
+
 async function finishWorktreeSetup(args: CreateWorktreeArgs): Promise<void> {
+  await refreshWorktreeIndex(args.targetPath, args.signal);
   emitCwd({
     onProgress: args.onProgress,
     keySuffix: "target",
@@ -975,11 +992,15 @@ async function hasCommitsOnlyOnBranch(args: {
   baseBranch: string | null;
   gitOptions: RunGitOptions;
 }): Promise<boolean> {
-  const base =
+  const baseRef =
     args.baseBranch === null
       ? null
+      : (await resolveBranchRef(args.gitOptions.cwd, args.baseBranch)).ref;
+  const base =
+    baseRef === null
+      ? null
       : await runGit(
-          ["rev-parse", "--verify", "--quiet", `${args.baseBranch}^{commit}`],
+          ["rev-parse", "--verify", "--quiet", `${baseRef}^{commit}`],
           { ...args.gitOptions, allowFailure: true },
         );
   const baseOid =
