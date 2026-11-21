@@ -59,12 +59,13 @@ import { CollapsibleStackCard } from "@/components/promptbox/banner/CollapsibleS
 import { usePluginThreadExtensionState } from "@/components/plugin/usePluginThreadExtensionState";
 import { useQuestionFormHost } from "@bb/shared-ui/question-form-host";
 import { definePluginApp } from "./plugin-app-definition";
+import { useBbContext } from "./plugin-bb-context";
 import {
-  useBbContext,
   useBbNavigate,
   usePluginCanOpenFileExternally,
   useComposer,
   useComposers,
+  useActiveComposer,
   useComposerView,
   useEnvironmentProviders,
   useProviders,
@@ -92,10 +93,8 @@ import {
   useSidebarThreadShortcut,
   useSidebarThreads,
 } from "./plugin-sidebar-hooks";
-import {
-  useSidebarSplitLayout,
-  useSidebarThreadSplit,
-} from "./plugin-sidebar-split";
+import { useSidebarSplitLayout } from "./plugin-split-layout";
+import { useSidebarThreadSplit } from "./plugin-sidebar-split";
 import { useExperiment } from "./plugin-experiments";
 import {
   experimental_PluginRpcCallError,
@@ -127,9 +126,10 @@ import { InfoListRow } from "@bb/shared-ui/info-list-row";
 import { DetailRow } from "@/components/ui/detail-card";
 import { ThreadContextCardRow } from "@/components/plugin/ThreadContextCardRow";
 import { SurfaceInfoSection } from "@/components/plugin/ThreadContextCardSection";
-import { useThreadContextKind } from "@/components/plugin/PluginThreadContextCard";
+import { useThreadContextKind } from "@/components/plugin/thread-context-card-pane";
 import { useTabVisible } from "@/components/secondary-panel/tab-visibility";
 import { useServerChoices } from "@/hooks/useServerChoices";
+import { getServerChoices } from "@/lib/server-choices";
 import { ThreadRowMetadata } from "@/components/plugin/ThreadRowMetadata";
 
 function PluginInfoListRow({
@@ -169,12 +169,14 @@ export const pluginSdkAppImplementation = {
   experimental_useCanOpenFileExternally: usePluginCanOpenFileExternally,
   experimental_useTabVisible: useTabVisible,
   experimental_useServers: useServerChoices,
+  experimental_hasServers: () => getServerChoices() !== null,
   experimental_useAppPanel,
   experimental_useFixedTabTarget,
   experimental_usePanelTabs,
   experimental_PanelTabIcon: PanelTabIcon,
   useComposer,
   useComposers,
+  experimental_useActiveComposer: useActiveComposer,
   experimental_useComposerRenderer: useComposerRendererApi,
   experimental_useThreadTitleDisplayText: useThreadTitleDisplayText,
   experimental_useComposerContributions: useComposerContributions,

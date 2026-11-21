@@ -154,6 +154,7 @@ function makeTarget(
     pinnedAt: null,
     sectionId: null,
     isUnread: false,
+    isHidden: false,
     status: "idle",
     environment: null,
     ...overrides,
@@ -185,6 +186,7 @@ function Probe({
           sdk,
           navigate,
           panel,
+          composer: null,
         }),
       (threads) =>
         notificationsThreadAction.experimental_bulkItem?.({
@@ -193,6 +195,7 @@ function Probe({
           sdk,
           navigate,
           panel,
+          composer: null,
         }) ?? null,
     );
   });

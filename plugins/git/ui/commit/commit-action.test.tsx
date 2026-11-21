@@ -74,6 +74,7 @@ function target(
     pinnedAt: null,
     sectionId: null,
     isUnread: false,
+    isHidden: false,
     status: "idle",
     environment: { id: "env-1", path: "/work/env-1" },
     ...overrides,
@@ -95,6 +96,7 @@ function Probe({ onItem }: { onItem(item: ItemFor): void }) {
         sdk,
         navigate,
         panel,
+        composer: null,
       }),
     );
   });

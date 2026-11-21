@@ -7,7 +7,7 @@ Hooks:
   `projects`, `environments`, `hosts`, `files`, …), running with the
   signed-in user's session on the app origin. The first choice for reading
   and mutating bb state from a frontend: `sdk.threadSections.create({ name })`,
-  `sdk.threads.update({ id, sectionId })`, `sdk.threads.pin({ id })`,
+  `sdk.threads.update({ threadId, sectionId })`, `sdk.threads.pin({ threadId })`,
   `sdk.threads.spawn(request)`. `spawn` and `fork` stamp your plugin as the
   origin and the plugin-metadata calls default `pluginId`, exactly like the
   backend client. Thread title, section, and parent updates are optimistic in
@@ -16,8 +16,9 @@ Hooks:
   unread are optimistic too. For bb's archive and delete flows (child
   confirmation, pane cleanup, Undo) render bb's thread menu or run its
   thread actions; see "An action in every thread menu". The client is stable,
-  so it is safe in dependency lists. Test with `renderSlot({ sdk: { threads: { update: async () => ({ … }) }
-} } })` and read `inspection.sdkCalls`.
+  so it is safe in dependency lists. Test with
+  `renderSlot(registration, props, { sdk: { threads: { update: async () => ({ … }) } } })`
+  and read `inspection.sdkCalls`.
 - `useRpc<typeof rpcContract>()` → `{ call(method, input?) }` — exact method,
   input, and result inference from a type-only backend contract import.
   Reach for it when the work needs your server: secrets, host files, or your
@@ -152,6 +153,7 @@ reasoningLevel?, serviceTier?, permissionMode? })` sets the pickers as if
   `PluginComposerApi` with the same lifetime rule; `setTextEffect` and
   `setInputLock` have no effect here. Re-renders when the list or a listed
   draft or selection changes.
+- `experimental_useActiveComposer()` → see [Active composer](frontend-renderer-slots.md#active-composer).
 - `experimental_useCodeTheme()` → `{ mode, name, theme }` — the code theme bb
   is currently rendering with. `mode` is `"light" | "dark"`, `name` is the
   registered theme name for that mode, and `theme` is the resolved **VS Code
@@ -209,8 +211,9 @@ sendMenu?, banners?, richText? })`. Omitted `scopes` means all thread,
   Each item supplies `id`, `label`, optional `icon` (drawn instead of the
   plugin's branding icon), `description`, and `disabled` (a boolean or a
   function of the composer, re-evaluated when the draft or selection changes),
-  plus `run({ composer, ...[callback context](#callback-context) })`. `plusMenu` rows also appear in the sent-message
-  editor (scope `thread`), where the other customizations do not mount.
+  plus `run({ composer, ...[callback context](#callback-context) })`. `plusMenu` rows, their popups, and
+  composer commands also work in the sent-message editor (scope `thread`),
+  where actions, banners, `sendMenu` rows and rich text do not mount.
 - `richText.effects` rules return plain-text `{ from, to }` ranges and a class
   name from plugin CSS. Decorations are paint-only and never mutate the draft.
 - A `messageAction`'s `run` receives `context.composer`: the composer of the
@@ -328,16 +331,15 @@ compile in plugin builds.
 
 ## Callback context
 
-Callbacks run outside your components and cannot call hooks, so every callback's
-context extends `ExperimentalPluginActionContext` `{ sdk, navigate, panel }`: your
-`useSdk()`, your `useBbNavigate()`, and the [panel controller](#panel-controller)
-of the surface that invoked it. That covers `app.commands`, `messageAction`,
-`experimental_threadAction`, action tabs, `experimental_newThreadPanelAction`,
-sidebar footer actions, composer commands and `plusMenu`/`sendMenu` rows.
-`navigate` and `panel` act on the focused surface for commands, thread actions
-and footer actions; on the message's thread view for message actions; on the
-launching surface for panel actions; and on the composer's surface for composer
-callbacks. Experimental: see `docs/api_to_audit.md`.
+Callbacks cannot call hooks, so every callback's context extends `ExperimentalPluginActionContext`
+`{ sdk, navigate, panel, composer }`: your `useSdk()`, your `useBbNavigate()`, the
+[panel controller](#panel-controller) of the invoking surface, and the composer it acts on
+(see [Active composer](frontend-renderer-slots.md#active-composer)). That covers `app.commands`,
+`messageAction`, `experimental_threadAction`, action tabs, `experimental_newThreadPanelAction`,
+sidebar footer actions, composer commands and `plusMenu`/`sendMenu` rows. `navigate` and
+`panel` act on the focused surface for commands, thread actions and footer actions; on the
+message's thread view for message actions; on the launching surface for panel actions; and
+on the composer's surface for composer callbacks. Experimental: see `docs/api_to_audit.md`.
 
 ## Panel controller
 

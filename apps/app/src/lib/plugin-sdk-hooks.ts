@@ -19,7 +19,6 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import type {
-  BbContext,
   ComposerView,
   PluginComposerApi,
   PluginComposerScope,
@@ -46,8 +45,14 @@ import {
   composerScopeIdentity,
   useOptionalPluginComposerView,
   usePluginComposerHost,
+  usePluginComposerHostDraft,
   type PluginComposerHost,
 } from "@/components/plugin/plugin-composer-host";
+import {
+  activeComposerHandle,
+  getActiveComposer,
+  subscribeActiveComposer,
+} from "@/lib/active-composer";
 import {
   getComposerEditorBridges,
   subscribeComposerEditorBridges,
@@ -72,8 +77,6 @@ import {
 } from "@/hooks/usePromptDraftStorage";
 import { emptyPromptDraftState, isPromptDraftEmpty } from "@bb/client-core";
 import { useRouteState } from "@/hooks/useRouteState";
-import { useLocation } from "react-router-dom";
-import { paneContentForPathname } from "@/views/thread-detail/splitThreadNavigation";
 import { useServerConnectionState } from "@/hooks/useServerConnectionState";
 import { wsManager } from "@/lib/ws";
 import { pluginSdkSettingsQueryKey } from "@/hooks/queries/query-keys";
@@ -326,24 +329,6 @@ export function useEnvironmentProviders(): PluginEnvironmentProvidersState {
             })),
           },
     [providers],
-  );
-}
-
-export function useBbContext(): BbContext {
-  const { projectId, threadId } = useRouteState();
-  const content = paneContentForPathname(useLocation().pathname);
-  const pluginPanel = content?.kind === "plugin-panel" ? content : null;
-  const pluginId = pluginPanel?.pluginId ?? null;
-  const path = pluginPanel?.panelPath ?? null;
-  const subPath = pluginPanel?.subPath ?? "";
-  return useMemo(
-    () => ({
-      projectId: projectId ?? null,
-      threadId: threadId ?? null,
-      experimental_pluginPanel:
-        pluginId === null || path === null ? null : { pluginId, path, subPath },
-    }),
-    [path, pluginId, projectId, subPath, threadId],
   );
 }
 
@@ -845,6 +830,18 @@ export function useComposers(): readonly PluginComposerApi[] {
     () => listedComposerHandles(pluginId, hosts),
     [hosts, pluginId],
   );
+}
+
+export function useActiveComposer(): PluginComposerApi | null {
+  const pluginId = usePluginId();
+  const active = useSyncExternalStore(
+    subscribeActiveComposer,
+    getActiveComposer,
+    getActiveComposer,
+  );
+  const host = active?.host ?? null;
+  usePluginComposerHostDraft(host);
+  return useMemo(() => activeComposerHandle(pluginId, host), [host, pluginId]);
 }
 
 const rpcQueryHosts = new WeakMap<
