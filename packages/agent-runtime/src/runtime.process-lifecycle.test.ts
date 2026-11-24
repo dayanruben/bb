@@ -221,6 +221,7 @@ describe("createAgentRuntime process lifecycle", () => {
     });
     await expect(
       runtime.runTurn({
+        additionalWorkspaceWriteRoots: [],
         clientRequestId: "creq_222222224w",
         threadId: "t1",
         input: [promptTextInput({ text: "hi" })],
@@ -386,28 +387,30 @@ describe("createAgentRuntime process lifecycle", () => {
 
   it("does not wait for stalled replacement initialization during full shutdown", async () => {
     const stalledBridge = join(tmpDir, "stalled-provider.cjs");
-    const stalledBridgeStarted = join(tmpDir, "stalled-provider-started");
     writeFileSync(
       stalledBridge,
-      `require("readline").createInterface({input:process.stdin}).once("line",line=>{require("fs").writeFileSync(${JSON.stringify(stalledBridgeStarted)},"");setTimeout(()=>console.log(JSON.stringify({jsonrpc:"2.0",id:JSON.parse(line).id,result:{protocolVersion:2,capabilities:{grammarVersions:[3,3]}}})),3000)});`,
+      `require("readline").createInterface({input:process.stdin}).once("line",line=>{process.stderr.write("stalled-initialize-received\\n");setTimeout(()=>console.log(JSON.stringify({jsonrpc:"2.0",id:JSON.parse(line).id,result:{protocolVersion:2,capabilities:{grammarVersions:[3,3]}}})),3000)});`,
     );
     let starts = 0;
+    let markInitializing: () => void = () => {};
+    const replacementInitializing = new Promise<void>((resolve) => {
+      markInitializing = resolve;
+    });
     const manager = createProviderProcessManager({
       createAdapter: () =>
         createManagerAdapter(
           starts++ === 0 ? {} : { rawScriptPath: stalledBridge },
         ),
       onProcessExit: vi.fn(),
+      onStderr: (line) => {
+        if (line.includes("stalled-initialize-received")) markInitializing();
+      },
       workspacePath: tmpDir,
     });
     await manager.ensureProvider(MANAGER_PROVIDER);
     const retirement = manager.shutdownProvider(MANAGER_PROVIDER);
     const replacementStart = manager.ensureProvider(MANAGER_PROVIDER);
-    await waitForRuntimeState({
-      label: "the replacement bridge to begin initialization",
-      predicate: () => existsSync(stalledBridgeStarted),
-      timeoutMs: 1_000,
-    });
+    await replacementInitializing;
     expect(starts).toBe(2);
     const replacementProcess = manager.requireProviderProcess(MANAGER_PROVIDER);
     onTestFinished(async () => {
@@ -847,12 +850,14 @@ describe("createAgentRuntime process lifecycle", () => {
     );
     await Promise.all([
       runtime.runTurn({
+        additionalWorkspaceWriteRoots: [],
         clientRequestId: "creq_222222225a",
         threadId: "t1",
         input: [promptTextInput({ text: "first" })],
         options: fullRuntimeOptions,
       }),
       runtime.runTurn({
+        additionalWorkspaceWriteRoots: [],
         clientRequestId: "creq_222222225b",
         threadId: "t2",
         input: [promptTextInput({ text: "second" })],
@@ -892,6 +897,7 @@ describe("createAgentRuntime process lifecycle", () => {
     expect(runtime.hasThread("t1")).toBe(false);
     expect(runtime.listRunningProviders()).toEqual(["codex"]);
     await runtime.runTurn({
+      additionalWorkspaceWriteRoots: [],
       clientRequestId: "creq_2222222252",
       threadId: "t2",
       input: [promptTextInput({ text: "still alive" })],
@@ -1041,6 +1047,7 @@ describe("createAgentRuntime process lifecycle", () => {
         throw new Error("Expected a codex session");
       }
       await runtime.runTurn({
+        additionalWorkspaceWriteRoots: [],
         clientRequestId: "creq_2222222257",
         threadId: "t1",
         input: [promptTextInput({ text: "prestart_fail:401_Unauthorized" })],
@@ -1096,6 +1103,7 @@ describe("createAgentRuntime process lifecycle", () => {
         throw new Error("Expected a codex session");
       }
       await runtime.runTurn({
+        additionalWorkspaceWriteRoots: [],
         clientRequestId: "creq_2222222258",
         threadId: "t1",
         input: [promptTextInput({ text: "before reap" })],
@@ -1148,6 +1156,7 @@ describe("createAgentRuntime process lifecycle", () => {
         options: fullRuntimeOptions,
       });
       await runtime.runTurn({
+        additionalWorkspaceWriteRoots: [],
         clientRequestId: "creq_2222222259",
         threadId: "t1",
         input: [promptTextInput({ text: "after reap" })],
@@ -1189,6 +1198,7 @@ describe("createAgentRuntime process lifecycle", () => {
         options: fullRuntimeOptions,
       });
       await runtime.runTurn({
+        additionalWorkspaceWriteRoots: [],
         clientRequestId: "creq_222222226a",
         threadId: "t1",
         input: [promptTextInput({ text: "hold_turn" })],
@@ -1549,6 +1559,7 @@ describe("createAgentRuntime process lifecycle", () => {
     });
     await expect(
       runtime.runTurn({
+        additionalWorkspaceWriteRoots: [],
         clientRequestId: "creq_222222226b",
         threadId: "t1",
         input: [promptTextInput({ text: "after crash" })],
@@ -1577,6 +1588,7 @@ describe("createAgentRuntime process lifecycle", () => {
       options: fullRuntimeOptions,
     });
     await runtime.runTurn({
+      additionalWorkspaceWriteRoots: [],
       clientRequestId: "creq_2222222262",
       threadId: "t1",
       input: [promptTextInput({ text: "never starts" })],
@@ -1626,6 +1638,7 @@ describe("createAgentRuntime process lifecycle", () => {
       options: fullRuntimeOptions,
     });
     await runtime.runTurn({
+      additionalWorkspaceWriteRoots: [],
       clientRequestId: "creq_bgtaskdea2",
       threadId: "t1",
       input: [promptTextInput({ text: "bg_task" })],
@@ -1714,6 +1727,7 @@ describe("createAgentRuntime process lifecycle", () => {
   it("does not settle a background task its provider already settled", async () => {
     const { events, runtime } = await startIdleThreadWithOpenBackgroundTask();
     await runtime.runTurn({
+      additionalWorkspaceWriteRoots: [],
       clientRequestId: "creq_bgtaskdeb3",
       threadId: "t1",
       input: [promptTextInput({ text: "bg_task_done" })],

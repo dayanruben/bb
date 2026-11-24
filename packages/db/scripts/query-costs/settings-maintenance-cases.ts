@@ -8,6 +8,7 @@ import {
   getAppSettings,
   getAutoAppUpdate,
   getDisabledPluginProviderCatalog,
+  getOrCreateServerId,
   getDisabledProviderIds,
   getPluginRecommendationId,
   getPluginSafeMode,
@@ -363,6 +364,10 @@ const SETTINGS_CASES: readonly Case[] = [
     run: (db) => setAutoAppUpdate(db, false),
   },
   {
+    name: `${APP_SETTINGS}#getOrCreateServerId`,
+    run: (db) => getOrCreateServerId(db),
+  },
+  {
     name: `${APP_SETTINGS}#setServerAccessOrigins`,
     run: (db) =>
       setServerAccessOrigins(db, [
@@ -375,6 +380,11 @@ const SETTINGS_CASES: readonly Case[] = [
           providerId: "connect",
           pluginId: "connect",
           origin: "https://bee.getbb.app",
+        },
+        {
+          providerId: "local-network",
+          pluginId: null,
+          origin: "http://192.168.1.5:38886",
         },
       ]),
   },
@@ -458,16 +468,11 @@ const SETTINGS_CASES: readonly Case[] = [
     name: `${EXPERIMENTS}#setExperiments`,
     run: (db) =>
       setExperiments(db, {
-        agentCpuPriority: false,
         compactExpiredCache: true,
-        keyedPluginCss: true,
         serverMove: false,
         performanceDiagnostics: true,
         pluginUpdates: true,
-        resumeDaemonSessions: true,
-        skipFocusedThreadNotifications: true,
-        threadContextCard: true,
-        walCheckpointWorker: true,
+        serverRoutes: true,
       }),
   },
   {

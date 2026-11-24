@@ -1,6 +1,6 @@
 import { reportEnvironmentHookProgress } from "../services/environments/environment-hooks.js";
 import { syncDesktopBrowserTabs } from "../services/desktop-browsers.js";
-import { getExperiments, heartbeatSession } from "@bb/db";
+import { heartbeatSession, recordSessionRoute } from "@bb/db";
 import {
   HOST_DAEMON_WS_RESUME_REJECTED_CLOSE_CODE,
   HOST_DAEMON_WS_SHUTDOWN_CLOSE_REASON,
@@ -214,8 +214,7 @@ export function createDaemonSocketEvents(
       if (
         detached === "detached" &&
         reason !== HOST_DAEMON_WS_SHUTDOWN_CLOSE_REASON &&
-        deps.hub.getDaemonSessionSocket(target.sessionId) === channel &&
-        getExperiments(deps.db).resumeDaemonSessions
+        deps.hub.getDaemonSessionSocket(target.sessionId) === channel
       ) {
         onDaemonSocketDetached(deps, target);
         return;
@@ -236,6 +235,7 @@ export const SERVER_MOVE_FENCED_DAEMON_MESSAGE_TYPES: ReadonlySet<
   "desktop-browser.changed",
   "plugin-host.signal",
   "plugin-host.worker-exited",
+  "session.route",
   "terminal.opened",
   "terminal.exited",
 ]);
@@ -404,6 +404,14 @@ export function onDaemonSocketMessage(
       }
       if (message.type === "connect-tunnel.identity") {
         deps.sharedPorts.recordTunnelIdentity(args.hostId, message.identity);
+        return;
+      }
+      if (message.type === "session.route") {
+        recordSessionRoute(deps.db, {
+          sessionId: args.sessionId,
+          route: message.route,
+        });
+        deps.hub.notifyHost(args.hostId, ["host-connected"]);
         return;
       }
       if (message.type === "desktop-browser.changed") {

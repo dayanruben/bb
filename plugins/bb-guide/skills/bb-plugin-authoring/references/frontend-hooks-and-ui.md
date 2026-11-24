@@ -23,8 +23,7 @@ Hooks:
   input, and result inference from a type-only backend contract import.
   Reach for it when the work needs your server: secrets, host files, or your
   plugin's own storage.
-- `useRealtime(channel, handler)` — fires for this plugin's
-  `bb.realtime.publish(channel, …)` signals while mounted.
+- `useRealtime(channel, handler)` — fires for this plugin's `bb.realtime.publish(channel, …)` signals while mounted.
 - `useRealtimeConnectionState()` — returns `"connecting"`, `"connected"`, or
   `"reconnecting"` for the same shared socket used by `useRealtime`. Reconcile
   durable server state on subsequent transitions to `connected` (not the first
@@ -52,13 +51,13 @@ registerChoiceHandler, registerActionHandler }` inside a `pendingInteraction`
   fire from text fields inside an element marked `data-question-form`. The
   registry's `question-form` item uses it. Empty outside a pending interaction
   and in `renderSlot`.
-- `useBbNavigate()` → `{ toThread(id), toProject(id), toPluginPanel(path,
-{ subPath?, replace? }?), toCompose({ initialPrompt?, focusPrompt? }?),
-openUrl(url), experimental_openFilePreview(options),
-experimental_openFileExternally(options), experimental_openTerminal({ terminalId }) }`.
-  `toCompose` opens the root compose screen; pass `initialPrompt` to seed the
-  composer draft and `focusPrompt: true` to focus it. Open side-panel tabs
-  with the [panel controller](#panel-controller).
+- `useBbNavigate()` → `{ toThread(id, options?), toProject(id), toPluginPanel(path, { subPath?, replace? }?),
+toCompose({ initialPrompt?, focusPrompt?, split? }?), openUrl(url), experimental_openFilePreview(options),
+experimental_openFileExternally(options), experimental_openTerminal({ terminalId }), experimental_toSettings(target?),
+experimental_threadHref(id, options?), experimental_settingsHref(target?) }`; see [frontend-navigation.md](frontend-navigation.md).
+  `toCompose` opens the root compose screen; pass `initialPrompt` (a string or `ComposerInsertPart[]`, as `insert()` takes)
+  to seed an empty draft (`experimental_replacePrompt: true` replaces one with text), `focusPrompt: true` to focus it, and `split: true` to open it beside the caller.
+  Open side-panel tabs with the [panel controller](#panel-controller).
   `openUrl` owns HTTP(S) only and returns false for schemes BB
   leaves to normal anchor behavior. The two file methods accept an
   `ExperimentalFileOpenOptions` live-file target; the preview also accepts
@@ -79,7 +78,7 @@ experimental_openFileExternally(options), experimental_openTerminal({ terminalId
   when they change; depend on those fields, not on the handle, in memo
   dependency lists.
   - State: `scope` (`thread`, `queued-message`, or `new-thread`, with that
-    surface's identifiers), `key` (stable identity for the composer's draft:
+    surface's ids and project; thread scopes add `environmentId`), `key` (stable identity for the composer's draft:
     the same across remounts and reloads, per editing session for queued and
     sent-message editors), `layout`
     (`"expanded" | "compact"`), `isRunning`, `isSubmitting`,
@@ -178,6 +177,7 @@ reasoningLevel?, serviceTier?, permissionMode? })` sets the pickers as if
   representation next to the plain text. Resolves true once the clipboard holds
   the content and false when every path failed; it never rejects. Show your own
   success or failure feedback. Never call `navigator.clipboard` directly.
+- `experimental_showErrorToast({ error, fallbackMessage })` — bb's own failed-request toast: title `fallbackMessage`, description the server's message for an SDK error (not `error.message`, which reads `HTTP 409: ...`), bb's own text for network failures and lifecycle errors, nothing for an `AbortError`.
 - `experimental_saveFile({ fileName, url } | { fileName, blob })` →
   `Promise<"started" | "failed">` — saves a file
   through bb's own download path. Browsers and bb Desktop start an ordinary
@@ -222,12 +222,11 @@ sendMenu?, banners?, richText? })`. Omitted `scopes` means all thread,
   Popup ids must be unique across the plugin's composer customizations.
   Open by popup id with `composer.experimental_openPopup(id)`, from a
   `plusMenu` row's `composer`, or from a composer command (for example Ctrl+R):
-  `app.composer.experimental_registerCommand({ id, title, defaultShortcut?, run })`.
-  A composer command is listed and rebindable like any plugin command and shares
-  the `app.commands` ID namespace, but `run` receives `composer` (beside the [callback context](#callback-context)) for the
-  composer that handles it, through the same path as bb's own "Focus composer"
-  command: the composer holding the caret, or with the caret outside every
-  composer, the focused pane's primary composer. Its shortcut is inactive while
+  `app.composer.experimental_registerCommand({ id, title, defaultShortcut?, scopes?, isAvailable?, run })`.
+  It is listed, rebindable and namespaced like any plugin command; `run` gets `composer` (beside the [callback context](#callback-context)),
+  the handling composer, via bb's own "Focus composer" path: the one holding the caret, else the focused pane's primary composer.
+  `scopes` (customization kinds) and `isAvailable(context)` (same context as `run`; a throw counts as false) limit
+  which composers claim it; elsewhere the key falls through to bb and the palette hides the row. Its shortcut is inactive while
   a terminal, browser tab or modal has focus, and the palette lists it only when
   some composer would run it. The host
   shares mention-menu placement and dismissal, and uses a persistent responsive
@@ -278,7 +277,7 @@ composer.
 - `toast`: `import { toast } from "sonner"` — runtime-shimmed to bb's own
   toast, so `toast.success("Saved")` looks like bb's toasts and lands in the
   notification center; `toast.custom` keeps your rendering. Never mount your
-  own `<Toaster>`.
+  own `<Toaster>`. For a failed SDK call use `experimental_showErrorToast`.
 - Never bundled (runtime-shimmed, import freely): react, the portaling
   radix families (`@radix-ui/react-dialog`, `-alert-dialog`, `-popover`,
   `-select`, `-dropdown-menu`, `-context-menu`, `-menubar`, `-hover-card`,
