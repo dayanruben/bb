@@ -117,6 +117,11 @@ import {
   type ExperimentalThreadInfoRowRegistration,
   type ExperimentalThreadInfoSectionRegistration,
   type ExperimentalThreadHeaderRowRegistration,
+  type ExperimentalThreadRailRegistration,
+  type ExperimentalThreadRailOutlineRegistration,
+  type ExperimentalConversationOutline,
+  type ExperimentalConversationOutlineItem,
+  type ExperimentalTimelineViewport,
   type ExperimentalThreadHeaderTitleRegistration,
   type ExperimentalThreadContextCardRowRegistration,
   type ExperimentalThreadContextKind,
@@ -136,7 +141,6 @@ import {
   type ExperimentalThreadRowMetadataLineProps,
   type ExperimentalThreadRowMetadataRegistration,
   type PluginThreadActionsOptions,
-  type PluginThreadActionTarget,
   type ExperimentalPluginBrowserToolbarActionRegistration,
   type PluginThreadListRegistration,
   type PluginRpcContract,
@@ -401,6 +405,8 @@ interface SlotEnv {
   threadActionRegistrations: readonly PluginThreadActionRegistrationInfo[];
   sidebarDraftThreadIds: ReadonlySet<string>;
   threadStates: ReadonlyMap<string, ExperimentalThreadState>;
+  conversationOutlines: Readonly<Record<string, TestConversationOutlines>>;
+  timelineViewport: ExperimentalTimelineViewport | null;
   experiments: ReadonlySet<string>;
   threadContextKind: ExperimentalThreadContextKind;
   threadExtensionStates: Readonly<
@@ -440,14 +446,15 @@ interface TestFixedTabTargetStore {
  * What `experimental_useThreadActions(thread)` returns in a test, in menu
  * order; the host's own actions are not emulated. `requestRename` is the
  * caller's rename editor (a no-op when it passed none), for entries whose
- * `run` renames. The fake applies `keys`. Omitted → an empty list. The fake
+ * `run` renames. `thread` is what the plugin passed, as the host reads only
+ * its `id`. The fake applies `keys`. Omitted → an empty list. The fake
  * `experimental_ThreadActionsMenu` opens on a trigger click and the fake
  * context menu on right-click; each lists these entries and its `inline`
  * items as `menuitem` buttons, and closes after one runs (calling
  * `onOpenChange(false)` and `onCloseAutoFocus`).
  */
 export type TestThreadActionsResolver = (
-  thread: PluginThreadActionTarget,
+  thread: { id: string },
   options: { requestRename(threadId: string): void },
 ) => readonly PluginThreadActionEntry[];
 
@@ -460,7 +467,7 @@ export type TestThreadActionsResolver = (
  * an empty list.
  */
 export type TestThreadBulkActionsResolver = (
-  threads: readonly PluginThreadActionTarget[],
+  threads: readonly { id: string }[],
 ) => readonly PluginThreadActionEntry[];
 
 /** One recorded `experimental_useThreadRequests()` call. */
@@ -650,7 +657,7 @@ function noRenameEditor(): void {}
 
 function useTestThreadActions(
   hook: string,
-  thread: PluginThreadActionTarget,
+  thread: { id: string },
   options?: PluginThreadActionsOptions,
 ): readonly PluginThreadActionEntry[] {
   const entries = useSlotEnv(hook).threadActions(thread, {
@@ -672,7 +679,7 @@ function TestThreadActionsMenuItems({
   onClose,
 }: {
   hook: string;
-  thread: PluginThreadActionTarget;
+  thread: { id: string };
   inline?: PluginThreadActionsMenuProps["inline"];
   requestRename?: (threadId: string) => void;
   onClose: () => void;
@@ -875,6 +882,15 @@ function TestThreadActionsContextMenu({
     </div>
   );
 }
+
+/** A thread's outline items per role, for `conversationOutlines`. */
+export interface TestConversationOutlines {
+  user?: readonly ExperimentalConversationOutlineItem[];
+  assistant?: readonly ExperimentalConversationOutlineItem[];
+}
+
+const NO_OUTLINE_ITEMS: readonly ExperimentalConversationOutlineItem[] =
+  Object.freeze([]);
 
 const NOT_FOUND_THREAD: ExperimentalThreadState = Object.freeze({
   status: "notFound",
@@ -1985,6 +2001,21 @@ const testPluginSdkApp = {
       NOT_FOUND_THREAD
     );
   },
+  experimental_useConversationOutline(
+    threadId,
+    role,
+    options,
+  ): ExperimentalConversationOutline {
+    const outlines = useSlotEnv("experimental_useConversationOutline")
+      .conversationOutlines[threadId];
+    const items = outlines?.[role] ?? NO_OUTLINE_ITEMS;
+    return options?.enabled === false
+      ? { status: "loading", items: NO_OUTLINE_ITEMS }
+      : { status: "ready", items };
+  },
+  experimental_useTimelineViewport(): ExperimentalTimelineViewport | null {
+    return useSlotEnv("experimental_useTimelineViewport").timelineViewport;
+  },
   experimental_useProviders(): PluginProvidersState {
     return useSlotEnv("experimental_useProviders").providers;
   },
@@ -2022,7 +2053,7 @@ const testPluginSdkApp = {
     return useSlotEnv("experimental_useSidebarThreadActions").sidebarActions;
   },
   experimental_useThreadActions(
-    thread: PluginThreadActionTarget,
+    thread: { id: string },
     options?: PluginThreadActionsOptions,
   ): readonly PluginThreadActionEntry[] {
     return useTestThreadActions(
@@ -2261,6 +2292,8 @@ export interface CapturedPluginApp {
   threadInfoSections: ExperimentalThreadInfoSectionRegistration[];
   threadHeaderRows: ExperimentalThreadHeaderRowRegistration[];
   threadHeaderTitles: ExperimentalThreadHeaderTitleRegistration[];
+  threadRails: ExperimentalThreadRailRegistration[];
+  threadRailOutlines: ExperimentalThreadRailOutlineRegistration[];
   threadContextCardRows: ExperimentalThreadContextCardRowRegistration[];
   threadContextCardSections: import("../internal/plugin-app-registration-collector.js").CollectedThreadContextCardSectionRegistration[];
   threadActions: PluginThreadActionRegistration<unknown>[];
@@ -2597,6 +2630,14 @@ export interface RenderSlotOptions<
    * report `notFound`.
    */
   threads?: Readonly<Record<string, ExperimentalThreadState>>;
+  /**
+   * What `experimental_useConversationOutline(id, role)` reports per thread
+   * id and role, always `ready`; with `enabled: false` it reports `loading`
+   * and no items. Omitted → no items.
+   */
+  conversationOutlines?: Readonly<Record<string, TestConversationOutlines>>;
+  /** What `experimental_useTimelineViewport()` reports. Omitted → null. */
+  timelineViewport?: ExperimentalTimelineViewport;
   /** Experiment keys `experimental_useExperiment()` reports as on. Omitted → none. */
   experiments?: readonly string[];
   /** What `experimental_useThreadContextKind()` reports. Omitted → `banner`. */
@@ -3634,6 +3675,8 @@ export function renderSlot<
     },
     pluginId: options.pluginId ?? "test-plugin",
     questionFormHost: {
+      density: "default",
+      promptShownAbove: null,
       shortcuts: new Map(),
       actionShortcuts: new Map(),
       registerChoiceHandler: () => () => {},
@@ -3660,6 +3703,8 @@ export function renderSlot<
       options.threadActionRegistrations ?? NO_THREAD_ACTION_REGISTRATIONS,
     sidebarDraftThreadIds,
     threadStates,
+    conversationOutlines: options.conversationOutlines ?? {},
+    timelineViewport: options.timelineViewport ?? null,
     experiments: new Set(options.experiments ?? []),
     threadContextKind: options.threadContextKind ?? "banner",
     threadExtensionStates: options.threadExtensionStates ?? {},

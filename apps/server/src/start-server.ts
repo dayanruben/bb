@@ -35,7 +35,7 @@ import { createMachineAuthService } from "./services/machine-auth.js";
 import { resolveBuiltinSkillsRootPath } from "./services/skills/builtin-skills-copy.js";
 import { SkillTreeRegistry } from "./services/skills/injected-skills.js";
 import { PluginHostArtifactRegistry } from "./services/plugins/plugin-host-artifact-registry.js";
-import { createProviderNativeRootsCache } from "./services/providers/native-roots.js";
+import { createProjectSkillIndexCache } from "./services/skills/skill-listing.js";
 import { createProviderLiveCommandsCache } from "./services/providers/provider-live-commands.js";
 import { createAiServiceRegistry } from "./services/ai/ai-service-registry.js";
 import { createAppUpdateService } from "./services/system/app-update.js";
@@ -271,7 +271,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   await machineAuth.ensureReady();
   const skillTreeRegistry = new SkillTreeRegistry();
   const pluginHostArtifacts = new PluginHostArtifactRegistry();
-  const providerNativeRoots = createProviderNativeRootsCache();
+  const projectSkillIndexes = createProjectSkillIndexCache();
   const providerLiveCommands = createProviderLiveCommandsCache();
   const aiServices = createAiServiceRegistry({
     onStatusChange: () => hub.notifySystem(["config-changed"]),
@@ -291,7 +291,8 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     terminalSessions,
   });
   pendingInteractions.start();
-  setPluginToolCallRegistry(new PluginToolCallRegistry({ logger }));
+  const pluginToolCalls = new PluginToolCallRegistry({ logger });
+  setPluginToolCallRegistry(pluginToolCalls);
 
   const appVersion = createAppVersionService({
     installKind: serverConfig.BB_APP_INSTALL_KIND ?? null,
@@ -399,7 +400,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       pendingInteractions,
       providerRegistry,
       pluginHostArtifacts,
-      providerNativeRoots,
+      projectSkillIndexes,
       providerLiveCommands,
       aiServices,
       skillTreeRegistry,
@@ -617,9 +618,11 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       pluginCatalogService.stopPeriodicRefresh();
       await pluginService.stopPeriodicUpdateChecks();
       if (pendingServerMove === null) {
+        pluginToolCalls.deferDeliveriesToRestart();
         await pluginService.stop().catch((error: unknown) => {
           logger.warn({ err: error }, "Plugin shutdown failed");
         });
+        await pluginToolCalls.settleDeliveries();
       }
       const closeServer = new Promise<void>((resolve, reject) => {
         server.close((error) => {

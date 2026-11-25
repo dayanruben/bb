@@ -1,6 +1,7 @@
 import { registerPluginUpdateJobRoutes } from "../../../src/routes/plugin-update-jobs.js";
 import { pluginUpdateJobResponseSchema } from "@bb/server-contract";
 import { createPluginUpdateJobs } from "../../../src/services/plugins/plugin-update-jobs.js";
+import { readPluginManifest } from "../../../src/services/plugins/manifest.js";
 import { execFile } from "node:child_process";
 import { cpSync } from "node:fs";
 import {
@@ -11,6 +12,7 @@ import {
   rename,
   rm,
   stat,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import Database from "better-sqlite3";
@@ -581,16 +583,16 @@ describe("plugin update service and routes", () => {
 
   it("checks a subdirectory update when its installed commit is missing remotely", async () => {
     const installedCommit = await installSubdirectoryUpdater();
-    await git(repo, ["checkout", "--orphan", "replacement"]);
+    await rm(join(repo, ".git"), { recursive: true, force: true });
+    await git(repo, ["init", "-q", "-b", "main"]);
+    await git(repo, ["config", "user.email", "test@example.com"]);
+    await git(repo, ["config", "user.name", "Test"]);
     await writeFile(
       join(repo, "plugins", "updater", "server.ts"),
       "export default function plugin() {}",
     );
     await git(repo, ["add", "-A"]);
     await git(repo, ["commit", "-qm", "Replace fixture history"]);
-    await git(repo, ["branch", "-M", "main"]);
-    await git(repo, ["reflog", "expire", "--expire=now", "--all"]);
-    await git(repo, ["prune", "--expire=now"]);
     await expect(
       git(repo, ["cat-file", "-e", installedCommit]),
     ).rejects.toThrow();
@@ -605,6 +607,81 @@ describe("plugin update service and routes", () => {
     ]);
     expect(materializationCount).toBe(2);
   });
+
+  it("updates a subdirectory plugin that imports from outside its directory", async () => {
+    await installSubdirectoryUpdater();
+    await mkdir(join(repo, "shared"));
+    await writeFile(
+      join(repo, "shared", "message.ts"),
+      'export const message = "shared one";',
+    );
+    await writeFile(
+      join(repo, "plugins", "updater", "server.ts"),
+      'import { message } from "../../shared/message.js";\nexport default function plugin(bb: any) { bb.log.info(message); }',
+    );
+    await git(repo, ["add", "-A"]);
+    await git(repo, ["commit", "-qm", "Import a shared module"]);
+    const nextCommit = await git(repo, ["rev-parse", "HEAD"]);
+
+    expect(await service.checkForUpdates("updater")).toMatchObject([
+      {
+        id: "updater",
+        outcome: "update-available",
+        candidate: { version: nextCommit },
+      },
+    ]);
+    await expect(service.applyUpdate("updater")).resolves.toMatchObject({
+      ok: true,
+      result: { applied: true },
+    });
+    const installed = getInstalledPluginRegistration(db, "updater");
+    expect(installed).toMatchObject({ gitResolvedCommit: nextCommit });
+    const rootDir = service
+      .list()
+      .find((entry) => entry.id === "updater")?.rootDir;
+    if (rootDir === undefined) throw new Error("updater has no rootDir");
+    expect(
+      await readFile(join(rootDir, "dist", "server.js"), "utf8"),
+    ).toContain("shared one");
+    await stat(join(rootDir, "..", "..", "shared", "message.ts"));
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "updates a subdirectory plugin whose skills are a symlink out of its directory",
+    async () => {
+      await installSubdirectoryUpdater();
+      await mkdir(join(repo, "shared", "skills", "review"), {
+        recursive: true,
+      });
+      await writeFile(
+        join(repo, "shared", "skills", "review", "SKILL.md"),
+        "---\nname: review\ndescription: Review changes.\n---\n\n# review\n",
+      );
+      await symlink(
+        join("..", "..", "shared", "skills"),
+        join(repo, "plugins", "updater", "skills"),
+      );
+      await git(repo, ["add", "-A"]);
+      await git(repo, ["commit", "-qm", "Link shared skills"]);
+      const nextCommit = await git(repo, ["rev-parse", "HEAD"]);
+
+      await expect(service.applyUpdate("updater")).resolves.toMatchObject({
+        ok: true,
+        result: { applied: true },
+      });
+      expect(getInstalledPluginRegistration(db, "updater")).toMatchObject({
+        gitResolvedCommit: nextCommit,
+      });
+      const rootDir = service
+        .list()
+        .find((entry) => entry.id === "updater")?.rootDir;
+      if (rootDir === undefined) throw new Error("updater has no rootDir");
+      await stat(join(rootDir, "skills", "review", "SKILL.md"));
+      expect((await readPluginManifest(rootDir)).skillNames).toEqual([
+        "review",
+      ]);
+    },
+  );
 
   it.each(["main", "semver:^1.0.0"])(
     "keeps healthy plugin results when the git remote for %s is unavailable",

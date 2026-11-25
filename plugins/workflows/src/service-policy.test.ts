@@ -62,6 +62,8 @@ function model() {
   };
 }
 
+type ModelsArgs = { selectedModel?: string; signal?: AbortSignal } | undefined;
+
 interface WorkerState {
   status: "active" | "idle" | "error";
   output: string | null;
@@ -420,6 +422,111 @@ describe("workflow service policy integration", () => {
       }
     },
   );
+
+  it.each([
+    { parent: "medium", requested: "high", resolved: "high" },
+    { parent: "high", requested: null, resolved: "high" },
+  ] as const)(
+    "discovers reasoning for an unknown model: parent=$parent requested=$requested",
+    async ({ parent, requested, resolved }) => {
+      const test = setup();
+      harnesses.push(test.harness);
+      test.harness.sdk.stub("providers.models", async (args: ModelsArgs) => ({
+        providers: [],
+        models: [
+          args?.selectedModel === "gpt-test"
+            ? {
+                ...model(),
+                supportedReasoningEfforts: ["low", "medium", "high"].map(
+                  (reasoningEffort) => ({
+                    reasoningEffort,
+                    description: "test",
+                  }),
+                ),
+              }
+            : {
+                ...model(),
+                reasoningDiscovery: "unknown" as const,
+                supportedReasoningEfforts: [],
+              },
+        ],
+        selectedOnlyModels: [],
+        modelLoadError: null,
+      }));
+      test.harness.sdk.stub("threads.defaultExecutionOptions", async () => ({
+        model: "gpt-test",
+        reasoningLevel: parent,
+        permissionMode: "full",
+        serviceTier: "default",
+        source: "default",
+      }));
+      const run = await test.start(
+        source(
+          requested === null
+            ? 'return await agent("review");'
+            : `return await agent("review", { provider: "codex", model: "gpt-test", reasoningLevel: "${requested}" });`,
+        ),
+      );
+      const controller = new AbortController();
+      const worker = test.service.runWorker(controller.signal);
+      try {
+        await eventually(() => {
+          expect(getRunRequired(test.db, run.id).error).toBeNull();
+          expect(test.childCount()).toBe(1);
+        });
+        expect(test.harness.sdk.callsTo("threads.spawn")[0]?.[0]).toMatchObject(
+          { model: "gpt-test", reasoningLevel: resolved },
+        );
+        expect(
+          test.harness.sdk
+            .callsTo("providers.models")
+            .map(([args]) => (args as ModelsArgs)?.selectedModel),
+        ).toEqual(["gpt-test"]);
+        test.service.onThreadIdle("child-1", "completed");
+        await eventually(() =>
+          expect(getRunRequired(test.db, run.id).status).toBe("succeeded"),
+        );
+      } finally {
+        controller.abort();
+        await worker;
+      }
+    },
+  );
+
+  it("aborts the model catalog request when the run is stopped", async () => {
+    const test = setup();
+    harnesses.push(test.harness);
+    const discoverySignals: AbortSignal[] = [];
+    test.harness.sdk.stub("providers.models", async (args: ModelsArgs) => {
+      const signal = args?.signal;
+      if (signal === undefined) throw new Error("Missing discovery signal");
+      discoverySignals.push(signal);
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+      });
+    });
+    const run = await test.start(
+      source(
+        'return await agent("review", { provider: "codex", model: "gpt-test", reasoningLevel: "high" });',
+      ),
+    );
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    try {
+      await eventually(() => expect(discoverySignals).toHaveLength(1));
+      await expect(test.service.stop(run.id)).resolves.toBe(true);
+      await eventually(() => {
+        expect(discoverySignals[0]?.aborted).toBe(true);
+        expect(getRunRequired(test.db, run.id).status).toBe("cancelled");
+      });
+      expect(test.childCount()).toBe(0);
+    } finally {
+      controller.abort();
+      await worker;
+    }
+  });
 
   it("applies live settings to future run snapshots without mutating existing runs", async () => {
     const initial = {
@@ -1725,7 +1832,9 @@ describe("workflow service policy integration", () => {
       status: "error" | "active";
       queuedRetryReason: string | null;
       latestRequest: Record<string, unknown>;
-      providerRetry: "absent" | { decidedRequestId: string | null };
+      providerRetry:
+        | "absent"
+        | { decidedRequestId: string | null; declineReason?: string };
       retryQueuedWithDecision?: boolean;
     },
   ) {
@@ -1782,7 +1891,10 @@ describe("workflow service policy integration", () => {
             decision:
               state.retryQueuedWithDecision === true
                 ? { kind: "retry", reason: "Provider unavailable" }
-                : { kind: "decline", reason: "not-retryable" },
+                : {
+                    kind: "decline",
+                    reason: providerRetry.declineReason ?? "not-retryable",
+                  },
           };
     });
   }
@@ -1844,6 +1956,19 @@ describe("workflow service policy integration", () => {
       reRuns: true,
     },
     {
+      name: "provider retry declined a rate limit it has no reset time for",
+      thread: {
+        status: "error",
+        queuedRetryReason: null,
+        latestRequest: { requestId: "creq_failed" },
+        providerRetry: {
+          decidedRequestId: "creq_failed",
+          declineReason: "no-rate-limit-state",
+        },
+      },
+      reRuns: true,
+    },
+    {
       name: "provider retry is not installed",
       thread: {
         status: "error",
@@ -1880,6 +2005,44 @@ describe("workflow service policy integration", () => {
           expect(getRunRequired(test.db, run.id).status).toBe("succeeded"),
         );
         expect(test.childCount()).toBe(reRuns ? 2 : 1);
+      } finally {
+        controller.abort();
+        await worker;
+      }
+    },
+  );
+
+  it.each(["attempts-exhausted", "beyond-maximum-wait", "pool-unavailable"])(
+    "fails the call without a replacement when provider retry declined it as %s",
+    async (declineReason) => {
+      const test = setup();
+      harnesses.push(test.harness);
+      const run = await test.start(source(`return await agent("retry");`));
+      const controller = new AbortController();
+      const worker = test.service.runWorker(controller.signal);
+      try {
+        await eventually(() =>
+          expect(getCall(test.db, run.id, 0)?.childThreadId).toBe("child-1"),
+        );
+        stubFailedWorker(test, {
+          status: "error",
+          queuedRetryReason: null,
+          latestRequest: { requestId: "creq_failed" },
+          providerRetry: { decidedRequestId: "creq_failed", declineReason },
+        });
+        test.service.onThreadFailed("child-1", "HTTP 429: Too many requests");
+
+        await eventually(() =>
+          expect(getRunRequired(test.db, run.id)).toMatchObject({
+            status: "failed",
+            error: "HTTP 429: Too many requests",
+          }),
+        );
+        expect(getCall(test.db, run.id, 0)).toMatchObject({
+          status: "failed",
+          providerRetryAttempts: 0,
+        });
+        expect(test.childCount()).toBe(1);
       } finally {
         controller.abort();
         await worker;
@@ -2488,6 +2651,9 @@ describe("provider retry classification", () => {
       ),
     ).toBe(true);
     expect(isRetryableProviderFailure("API error 529")).toBe(true);
+    expect(
+      isRetryableProviderFailure("Provider error (rate-limit, HTTP 429)"),
+    ).toBe(true);
     expect(isRetryableProviderFailure("read ECONNRESET")).toBe(true);
     expect(
       isRetryableProviderFailure(

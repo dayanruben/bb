@@ -1010,6 +1010,7 @@ list|get|set|reset` or `sdk.system.uiPreferences` (see
 | `diff.provider`                       | Plugin key, `__builtin__` (bb's diff), or `__automatic__` (default)                                                                                                                                           |
 | `sourceCode.provider`                 | Plugin key, `__builtin__` (bb's source viewer), or `__automatic__` (default)                                                                                                                                  |
 | `threadHeader.titleProvider`          | Plugin key, `__builtin__` (bb's thread title), or `__automatic__` (default)                                                                                                                                   |
+| `threadRail.outlineProvider`          | Plugin key, `__builtin__` (bb's thread outline), or `__automatic__` (default)                                                                                                                                 |
 | `fileOpener.byExtension`              | JSON map of extension to plugin key or `__builtin__` (bb's preview), such as `{"md":"simple-notes/docs"}`; a missing extension is Automatic                                                                   |
 | `codeFence.byLanguage`                | JSON map of code fence language to plugin key or `__builtin__` (bb's code block); a missing language is Automatic                                                                                             |
 | `messageDirective.byName`             | JSON map of directive name to plugin key or `__builtin__` (show as text); a name several plugins claim shows a plugin picker in the message until it is listed                                                  |
@@ -1396,7 +1397,8 @@ The builtin Worktree plugin can keep warm worktrees for a project so new
 worktree threads on the default base skip `git worktree add` and the setup
 script. It is off for every project; set a project's size from 0 to 4 on the
 plugin's settings page or with `bb worktree pool set <project-id> <size>`, and
-list them with `bb worktree pool status`. See
+list them with `bb worktree pool status`. A machine can keep its own count with
+`--host <host-id>`, or follow the project's again with the size `project`. See
 [Warm worktrees](worktrees.md#warm-worktrees) and the `worktree` skill.
 
 ### GitHub Star
