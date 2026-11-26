@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@bb/shared-ui": "workspace:*",
-    "@tiptap/core": "^3.32.3",
+    "@tiptap/core": "^3.30.5",
     "@tiptap/extension-blockquote": "^3.32.3",
     "@tiptap/extension-document": "^3.32.3",
     "@tiptap/extension-hard-break": "^3.32.3",
